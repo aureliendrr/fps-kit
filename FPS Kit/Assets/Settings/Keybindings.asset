@@ -33,7 +33,7 @@ MonoBehaviour:
     code: 99
   - action: 6
     type: 1
-    code: 119
+    code: 120
   - action: 7
     type: 1
     code: 32

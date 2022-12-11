@@ -11,51 +11,49 @@ public class PlayerMovements : MonoBehaviour
     private Collider[] obstructions = new Collider[8];
 
     private Vector3 moveDirection;
+    private float walkSpeed;
+    private float runSpeed;
 
     private Vector3 slopeMoveDirection;
     private RaycastHit slopeHit;
 
     private float currentHeight;
-    private float centerHeight;
-
-    private bool staminaRegenerated = true;
-    private bool staminaRecovering = false;
-
-    //https://www.youtube.com/watch?v=ZsgCNztmr3Q
 
     [Header("Settings")]
     [Header("Speed (Normal, Running)")]
     [SerializeField] private Vector2 standingSpeed;
     [SerializeField] private Vector2 crouchSpeed;
     [SerializeField] private Vector2 proningSpeed;
+
+    [Header("Speed Multiplier")]
+    [SerializeField] private float groundSpeedMultiplier = 1f;
+    [SerializeField] private float airSpeedMultiplier = .1f;
+
     [Header("Collider (Radius, Height, YOffset)")]
     [SerializeField] private Vector3 standingCollider;
     [SerializeField] private Vector3 crouchingCollider;
     [SerializeField] private Vector3 proningCollider;
-    [Space]
-    [SerializeField] private float walkSpeed = 6f;
-    [SerializeField] private float runSpeed = 10f;
-    [SerializeField] private float airMultiplier = .1f;
-    [SerializeField] private float jumpForce = 5f;
-    [SerializeField] private float rbGroundedDrag = 6f;
-    [Space]
-    [SerializeField] private float maxStamina = 100;
-    [SerializeField] private float staminaSprintBurnTime = 35f;
-    [SerializeField] private float staminaJumpCost = 35f;
-    [SerializeField] private float staminaRecoverTime = 20f;
-    [Space]
-    [SerializeField] private float slideForce;
-    [Space]
+    [SerializeField] private float colliderThreshold;
+    
+    [Header("Jump")]
+    [SerializeField] private float jumpForce = 6f;
+    [SerializeField] private float jumpStamina = 35f;
+    
+    [Header("Ridigbody Drag")]
+    [SerializeField] private float rbGroundDrag = 6f;
+    [SerializeField] private float rbAirDrag = .1f;
+    
+    [Header("Slope")]
+    [SerializeField] private float maxSlopeAngle;
+    
+    [Header("Grounded")]
     [SerializeField] private LayerMask groundMask;
     [SerializeField] private float groundDistance = 0.4f;
-    [SerializeField] private float rbAirDrag = 2f;
 
     [Header("Stats")]
     public CharacterStance stance;
     [SerializeField] private float currentSpeed;
     [SerializeField] private float stamina;
-    [SerializeField] private bool sprinting = true;
-    [SerializeField] private bool jumping = true;
     [SerializeField] private bool sliding = true;
 
     [Header("Player Controls")]
@@ -96,14 +94,10 @@ public class PlayerMovements : MonoBehaviour
 
         int mask = 0;
         for (int i = 0; i < 32; i++)
-            if(Physics.GetIgnoreLayerCollision(gameObject.layer, i))
+            if(!Physics.GetIgnoreLayerCollision(gameObject.layer, i))
                 mask |= 1 << i;
 
         layerMask = mask;
-
-        stamina = maxStamina;
-        staminaRegenerated = true;
-        staminaRecovering = false;
     }
 
     private void ComponentsCheck()
@@ -139,12 +133,10 @@ public class PlayerMovements : MonoBehaviour
 
     public bool OnSlope()
     {
-        if(Physics.Raycast(transform.position, Vector3.down, out slopeHit, centerHeight))
+        if(Physics.Raycast(transform.position, Vector3.down, out slopeHit, currentHeight * 0.5f + groundDistance))
         {
-            if (slopeHit.normal != Vector3.up)
-            {
-                return true;
-            }
+            float angle = Vector3.Angle(Vector3.up, slopeHit.normal);
+            return angle < maxSlopeAngle && angle != 0;
         }
 
         return false;
@@ -154,7 +146,7 @@ public class PlayerMovements : MonoBehaviour
     {
         HandlePlayerMovementsInput();
         HandleCharacterSpeed();
-        HandleRigidbodyDrag();
+        HandleRigidbody();
         HandleSlope();
         HandleJump();
         /*
@@ -180,8 +172,7 @@ HandleSlide();
 
     private void HandleCharacterSpeed()
     {
-        sprinting = sprintInput && !crouchInput && staminaRegenerated;
-        currentSpeed = sprinting ? runSpeed : walkSpeed;
+        currentSpeed = sprintInput ? runSpeed : walkSpeed;
     }
 
     private void HandleSlope()
@@ -189,19 +180,17 @@ HandleSlide();
         slopeMoveDirection = Vector3.ProjectOnPlane(moveDirection, slopeHit.normal);
     }
 
-    private void HandleRigidbodyDrag()
+    private void HandleRigidbody()
     {
-        rb.drag = Grounded() ? rbGroundedDrag : rbAirDrag;
+        rb.drag = Grounded() ? rbGroundDrag : rbAirDrag;
+        rb.useGravity = !OnSlope();
     }
 
     private void HandleJump()
     {
-        jumping = jumpInput && Grounded();
-
-        if (jumping)
+        if (jumpInput && Grounded())
         {
             rb.AddForce(transform.up * jumpForce, ForceMode.Impulse);
-            //UpdateStamina(staminaJumpCost);
             jumpInput = false;
         }
     }
@@ -316,7 +305,7 @@ HandleSlide();
 
     private bool CharacterOverlap(Vector3 collider)
     {
-        float radius = collider.x;
+        float radius = collider.x - colliderThreshold;
         float height = collider.y;
         Vector3 center = new Vector3(capsuleCollider.center.x, collider.z, capsuleCollider.center.z);
 
@@ -333,11 +322,14 @@ HandleSlide();
             point1 = transform.position + center - (transform.up * (height * 0.5f - radius));
         }
 
+        Debug.Log(point0 + ", " + point1 + ", " + radius);
         int numOverlaps = Physics.OverlapCapsuleNonAlloc(point0, point1, radius, obstructions, layerMask);
 
-        for (int i = 0; i < numOverlaps; i++)
+        for (int i = 0; i < numOverlaps; i++){
+            Debug.Log(obstructions[i].name);
             if (obstructions[i] == capsuleCollider)
                 numOverlaps--;
+        }
 
         return numOverlaps > 0;
     }
@@ -347,58 +339,8 @@ HandleSlide();
         capsuleCollider.center = new Vector3(capsuleCollider.center.x, collider.z, capsuleCollider.center.z);
         capsuleCollider.radius = collider.x;
         capsuleCollider.height = collider.y;
+        currentHeight = collider.y;
     }
-
-    /*
-
-private void HandleStamina()
-{
-//Recover Stamina
-if (staminaRecovering)
-{
-    if (stamina <= maxStamina + 0.01f)
-    {
-        stamina += staminaRecoverTime * Time.deltaTime;
-        if (stamina >= maxStamina)
-        {
-            stamina = maxStamina;
-            staminaRecovering = false;
-            staminaRegenerated = true;
-        }
-    }
-}
-
-//Burning Stamina
-if (staminaRegenerated)
-{
-    if (sprintInput && sprinting && grounded)
-    {
-        UpdateStamina(staminaSprintBurnTime * Time.deltaTime);
-    }
-}
-}
-
-private void UpdateStamina(float burn)
-{
-stamina -= burn;
-staminaRecovering = true;
-if (stamina <= 0)
-{
-    stamina = 0;
-    staminaRegenerated = false;
-}
-}
-
-private void HandleSlide()
-{
-sliding = slideInput && grounded;
-if (sliding)
-{
-    TriggerSlide();
-}
-}
-
-*/
 
     private void FixedUpdate()
     {
@@ -407,12 +349,6 @@ if (sliding)
 
     private void ApplyMovement()
     {
-        rb.AddForce((OnSlope() ? slopeMoveDirection.normalized : moveDirection.normalized) * currentSpeed * (Grounded() ? 1 : airMultiplier), ForceMode.Acceleration);
-    }
-
-    private void TriggerSlide()
-    {
-        Debug.Log("Slide !");
-        rb.AddForce(orientation.forward.normalized * slideForce, ForceMode.Impulse);
+        rb.AddForce((OnSlope() ? slopeMoveDirection.normalized : moveDirection.normalized) * currentSpeed * (Grounded() ? groundSpeedMultiplier : airSpeedMultiplier), ForceMode.Acceleration);
     }
 }
