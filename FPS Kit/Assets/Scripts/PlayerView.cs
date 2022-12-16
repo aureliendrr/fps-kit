@@ -30,7 +30,6 @@ public class PlayerView : MonoBehaviour
     [Header("References")]
     [SerializeField] private Transform orientation;
     [SerializeField] private Transform viewCamera;
-    [SerializeField] private Transform viewPosition;
 
     private void Start()
     {
@@ -99,13 +98,12 @@ public class PlayerView : MonoBehaviour
     private void HandleViewPosition()
     {
         //apply pos to target with damping
-        viewPosition.localPosition = Vector3.Lerp(viewPosition.localPosition, viewTarget, viewTransitionTime * Time.deltaTime);
+        viewCamera.localPosition = Vector3.Lerp(viewCamera.localPosition, viewTarget, viewTransitionTime * Time.deltaTime);
     }
 
     private void ApplyView()
     {
         viewCamera.rotation = Quaternion.Euler(rotationX, rotationY, 0); //Looking up and down (only the camera)
         orientation.transform.rotation = Quaternion.Euler(0, rotationY, 0); //Looking right and left (by the player rotation)
-        viewCamera.position = viewPosition.position;
     }
 }

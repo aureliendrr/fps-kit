@@ -44,7 +44,8 @@ public class PlayerMovements : MonoBehaviour
     [SerializeField] private float rbAirDrag = .1f;
     
     [Header("Slope")]
-    [SerializeField] private float maxSlopeAngle;
+    [SerializeField] private float maxSlopeAngle = 40f;
+    [SerializeField] private float maxSlopeDistance = 0.05f;
     
     [Header("Grounded")]
     [SerializeField] private LayerMask groundMask;
@@ -133,7 +134,7 @@ public class PlayerMovements : MonoBehaviour
 
     public bool OnSlope()
     {
-        if(Physics.Raycast(transform.position, Vector3.down, out slopeHit, currentHeight * 0.5f + groundDistance))
+        if(Physics.Raycast(transform.position, Vector3.down, out slopeHit, currentHeight * 0.5f + maxSlopeDistance))
         {
             float angle = Vector3.Angle(Vector3.up, slopeHit.normal);
             return angle < maxSlopeAngle && angle != 0;
@@ -183,7 +184,7 @@ HandleSlide();
     private void HandleRigidbody()
     {
         rb.drag = Grounded() ? rbGroundDrag : rbAirDrag;
-        rb.useGravity = !OnSlope();
+        //rb.useGravity = !OnSlope();
     }
 
     private void HandleJump()
@@ -349,6 +350,6 @@ HandleSlide();
 
     private void ApplyMovement()
     {
-        rb.AddForce((OnSlope() ? slopeMoveDirection.normalized : moveDirection.normalized) * currentSpeed * (Grounded() ? groundSpeedMultiplier : airSpeedMultiplier), ForceMode.Acceleration);
+        rb.AddForce((Grounded() ? groundSpeedMultiplier : airSpeedMultiplier) * currentSpeed * (OnSlope() ? slopeMoveDirection.normalized : moveDirection.normalized), ForceMode.Acceleration);
     }
 }
