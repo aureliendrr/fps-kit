@@ -5,24 +5,18 @@ using UnityEngine;
 public class PlayerView : MonoBehaviour
 {
     //-----PRIVATE
-    private InputManager inputManager;
-    private PlayerMovements playerMovements;
+    private PlayerManager manager;
+    private PlayerInputs inputs;
+    private PlayerMovements movements;
+    
 
     private Vector3 viewTarget;
     private Vector2 clamp;
-
-    [Header("Camera controls")]
-    [SerializeField] private float mouseX = 0f;
-    [SerializeField] private float mouseY = 0f;
-    [SerializeField] private float rotationX = 0f;
-    [SerializeField] private float rotationY = 0f;
 
     [Header("Settings")]
     [Header("View Position (Standing, Crouching, Proning)")]
     [SerializeField] private Vector3 viewPos;
     [SerializeField] private float viewTransitionTime = 10f;
-    [SerializeField] private float sensitivityX = 4f;
-    [SerializeField] private float sensitivityY = 4f;
     [Header("Clamp Rotation (Standing, Crouching, Proning)")]
     [SerializeField] private Vector3 clampMinX;
     [SerializeField] private Vector3 clampMaxX;
@@ -30,16 +24,28 @@ public class PlayerView : MonoBehaviour
     [Header("References")]
     [SerializeField] private Transform orientation;
     [SerializeField] private Transform viewCamera;
+    [SerializeField] private Camera playerCam;
+
+    private float rotationX = 0f;
+    private float rotationY = 0f;
 
     private void Start()
     {
-        inputManager = InputManager.instance;
-        playerMovements = GetComponent<PlayerMovements>();
+        manager = PlayerManager.instance;
+        inputs = GetComponent<PlayerInputs>();
+        movements = GetComponent<PlayerMovements>();
 
         if (viewCamera == null)
         {
+            Debug.LogError("You need to reference the camera Gamobject of the player to " + this.name);
+        }
+
+        if (playerCam == null)
+        {
             Debug.LogError("You need to reference the camera of the player to " + this.name);
         }
+
+        playerCam.fieldOfView = manager.settings.fov;
 
         Cursor.lockState = CursorLockMode.Locked;
         Cursor.visible = false;
@@ -55,7 +61,7 @@ public class PlayerView : MonoBehaviour
 
     private void HandlePlayerStance()
     {
-        switch (playerMovements.stance)
+        switch (movements.stance)
         {
             case PlayerMovements.CharacterStance.Standing:
                 viewTarget = new Vector3(0, viewPos.x, 0);
@@ -79,13 +85,9 @@ public class PlayerView : MonoBehaviour
 
     private void HandlePlayerCameraInput()
     {
-        //Get inputs
-        mouseX = inputManager.AxisRaw("Mouse X");
-        mouseY = inputManager.AxisRaw("Mouse Y");
-
         //Apply to the rotations
-        rotationY += mouseX * sensitivityX;
-        rotationX -= mouseY * sensitivityY;
+        rotationY += inputs.mouseX * manager.settings.sensitivityX;
+        rotationX -= inputs.mouseY * manager.settings.sensitivityY;
 
         //Clamp
         rotationX = Mathf.Clamp(rotationX, clamp.x, clamp.y); 

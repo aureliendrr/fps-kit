@@ -1,25 +1,59 @@
+using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 
-[CreateAssetMenu(fileName = "Weapon", menuName = "FPS Kit/Weapon")]
-public class Weapon : ScriptableObject
+public class Weapon : MonoBehaviour
 {
-    [Header("Weapon Movement Sway")]
-    public float mSwayAmountX = 100f;
-    public float mSwayAmountY = 100f;
-    public float mSwayAmountZ = 100f;
-    public float mSwaySmoothing = 100f;
-    public float mSwayResetSmoothing = 1f;
-    public bool mSwayZAxis = true;
-    public bool mSwayXInverted = false;
-    public bool mSwayYInverted = false;
-    public bool mSwayZInverted = false;
-    public float mSwayClampX;
-    public float mSwayClampY;
-    public float mSwayClampZ;
+    public WeaponSettings settings;
 
-    [Header("Weapon Breathing Sway")]
-    public float bSwayAmountA = 1f;
-    public float bSwayAmountB = 1f;
-    public float bSwayScale = 600f;
-    public float bSwayLerpSpeed = 14f;
+    [Header("Use")]
+    public WeaponMode weaponMode;
+
+    [Header("Ammo")]
+    [SerializeField] private int bullets;
+    [SerializeField] private int bulletsLeft;
+
+    [Header("Shoot")]
+    [SerializeField] private float fireRate;
+    private float fireTimer;
+
+    //References
+    private PlayerWeapon playerWeapon;
+    
+    public void InitializeWeapon(PlayerWeapon playerWeapon)
+    {
+        this.playerWeapon = playerWeapon;
+
+        bullets = settings.bulletsPerMag;
+        bulletsLeft = settings.maxBullets;
+
+        fireRate = 1 / (settings.rpm / 60);
+        fireTimer = 0.0f;
+    }
+
+    private void Update()
+    {
+        HandleShoot();
+    }
+
+    private void HandleShoot()
+    {
+        if(fireTimer <= fireRate)
+        {
+            fireTimer += Time.deltaTime;
+        }
+    }
+
+    public void Shoot()
+    {
+        if(fireTimer < fireRate || bullets <= 0)
+            return;
+
+        Debug.Log("Shoot");
+        bullets--;
+
+        playerWeapon.RequestRecoil();
+
+        fireTimer = 0.0f;
+    }
 }

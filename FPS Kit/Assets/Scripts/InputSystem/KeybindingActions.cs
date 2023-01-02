@@ -1,5 +1,6 @@
 public enum KeybindingAction
 {
+    Debug,
     Forward,
     Backward,
     Right,
@@ -10,5 +11,7 @@ public enum KeybindingAction
     Jump,
     Slide,
     Interact,
+    Aim,
+    Shoot,
     Pause
 }

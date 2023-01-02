@@ -1,14 +1,10 @@
-using System.Collections;
-using System.Collections.Generic;
+using System;
 using UnityEngine;
 
 public class PlayerMovements : MonoBehaviour
 {
     //-----PRIVATE
-    private InputManager inputManager;
-
-    private LayerMask layerMask;
-    private Collider[] obstructions = new Collider[8];
+    private PlayerInputs inputs;
 
     private Vector3 moveDirection;
     private float walkSpeed;
@@ -18,6 +14,15 @@ public class PlayerMovements : MonoBehaviour
     private RaycastHit slopeHit;
 
     private float currentHeight;
+
+    public enum CharacterStance
+    {
+        Standing,
+        Crouching,
+        Proning
+    }
+
+    [SerializeField] private bool debug;
 
     [Header("Settings")]
     [Header("Speed (Normal, Running)")]
@@ -33,11 +38,13 @@ public class PlayerMovements : MonoBehaviour
     [SerializeField] private Vector3 standingCollider;
     [SerializeField] private Vector3 crouchingCollider;
     [SerializeField] private Vector3 proningCollider;
-    [SerializeField] private float colliderThreshold;
+    [SerializeField] private LayerMask obstructionMask;
     
     [Header("Jump")]
     [SerializeField] private float jumpForce = 6f;
-    [SerializeField] private float jumpStamina = 35f;
+
+    [Header("Slide")]
+    [SerializeField] private float slideForce = 10f;
     
     [Header("Ridigbody Drag")]
     [SerializeField] private float rbGroundDrag = 6f;
@@ -54,31 +61,17 @@ public class PlayerMovements : MonoBehaviour
     [Header("Stats")]
     public CharacterStance stance;
     [SerializeField] private float currentSpeed;
-    [SerializeField] private float stamina;
-    [SerializeField] private bool sliding = true;
-
-    [Header("Player Controls")]
-    [SerializeField] private int horizontalAxis;
-    [SerializeField] private int verticalAxis;
-    [SerializeField] private bool crouchInput;
-    [SerializeField] private bool proneInput;
-    [SerializeField] private bool jumpInput;
-    [SerializeField] private bool sprintInput;
-    [SerializeField] private bool slideInput;
 
     [Header("References")]
     [SerializeField] private CapsuleCollider capsuleCollider;
     [SerializeField] private Transform orientation;
     [SerializeField] private Rigidbody rb;
 
-    public enum CharacterStance
-    {
-        Standing,
-        Crouching,
-        Proning
-    }
+    //Actions
 
-    private void Start()
+    #region Awake
+
+    private void Awake()
     {
         SetDefaultValues();
         ComponentsCheck();
@@ -86,7 +79,7 @@ public class PlayerMovements : MonoBehaviour
 
     private void SetDefaultValues()
     {
-        inputManager = InputManager.instance;
+        inputs = GetComponent<PlayerInputs>();
 
         walkSpeed = standingSpeed.x;
         runSpeed = standingSpeed.y;
@@ -98,14 +91,14 @@ public class PlayerMovements : MonoBehaviour
             if(!Physics.GetIgnoreLayerCollision(gameObject.layer, i))
                 mask |= 1 << i;
 
-        layerMask = mask;
+        obstructionMask = mask;
     }
 
     private void ComponentsCheck()
     {
-        if(inputManager == null)
+        if(inputs == null)
         {
-            Debug.LogError("You need to have an InputManager instance ine the scene !");
+            Debug.LogError("You need to have the PlayerInput attached to the player gameobject !");
         }
 
         if (rb == null)
@@ -127,6 +120,82 @@ public class PlayerMovements : MonoBehaviour
         }
     }
 
+    #endregion
+
+    #region Actions
+
+    public bool RequestCrouch()
+    {
+        if(stance == CharacterStance.Standing || stance == CharacterStance.Proning)
+        {
+            if (!CharacterOverlap(crouchingCollider))
+            {
+                walkSpeed = crouchSpeed.x;
+                runSpeed = crouchSpeed.y;
+                stance = CharacterStance.Crouching;
+                SetColliderDimensions(crouchingCollider);
+                return true;
+            }
+        }
+        else
+        {
+            if (!CharacterOverlap(standingCollider))
+            {
+                walkSpeed = standingSpeed.x;
+                runSpeed = standingSpeed.y;
+                stance = CharacterStance.Standing;
+                SetColliderDimensions(standingCollider);
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public bool RequestProning()
+    {
+        if(stance == CharacterStance.Standing || stance == CharacterStance.Crouching)
+        {
+            if (!CharacterOverlap(proningCollider))
+            {
+                walkSpeed = proningSpeed.x;
+                runSpeed = proningSpeed.y;
+                stance = CharacterStance.Proning;
+                SetColliderDimensions(proningCollider);
+                return true;
+            }
+        }
+        else
+        {
+            if (!CharacterOverlap(standingCollider))
+            {
+                walkSpeed = standingSpeed.x;
+                runSpeed = standingSpeed.y;
+                stance = CharacterStance.Standing;
+                SetColliderDimensions(standingCollider);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public void RequestJump()
+    {
+        if (Grounded())
+        {
+            rb.AddForce(transform.up * jumpForce, ForceMode.Impulse);
+        }
+    }
+
+    public void RequestSlide()
+    {
+        if(inputs.sprintInput && RequestCrouch()){
+            rb.AddForce(orientation.forward * slideForce, ForceMode.Impulse);
+        }
+    }
+
+    #endregion
+
     public bool Grounded()
     {
         return Physics.CheckSphere(transform.position, groundDistance, groundMask);
@@ -145,35 +214,21 @@ public class PlayerMovements : MonoBehaviour
 
     private void Update()
     {
-        HandlePlayerMovementsInput();
+        HandlePlayerMovements();
         HandleCharacterSpeed();
         HandleRigidbody();
         HandleSlope();
-        HandleJump();
-        /*
-HandleStamina();
-HandleSlide();
-*/
     }
 
-    private void HandlePlayerMovementsInput()
+    private void HandlePlayerMovements()
     {
-        //Get inputs
-        horizontalAxis = inputManager.Action(KeybindingAction.Right) ? 1 : (inputManager.Action(KeybindingAction.Left) ? -1 : 0);
-        verticalAxis = inputManager.Action(KeybindingAction.Forward) ? 1 : (inputManager.Action(KeybindingAction.Backward) ? -1 : 0);
-        crouchInput = inputManager.Action(KeybindingAction.Crouch);
-        proneInput = inputManager.Action(KeybindingAction.Prone);
-        jumpInput = inputManager.Action(KeybindingAction.Jump);
-        sprintInput = inputManager.Action(KeybindingAction.Sprint);
-        slideInput = inputManager.Action(KeybindingAction.Slide);
-
         //Apply to move direction
-        moveDirection = orientation.forward * verticalAxis + orientation.right * horizontalAxis;
+        moveDirection = orientation.forward * inputs.verticalAxis + orientation.right * inputs.horizontalAxis;
     }
 
     private void HandleCharacterSpeed()
     {
-        currentSpeed = sprintInput ? runSpeed : walkSpeed;
+        currentSpeed = inputs.sprintInput ? runSpeed : walkSpeed;
     }
 
     private void HandleSlope()
@@ -184,155 +239,16 @@ HandleSlide();
     private void HandleRigidbody()
     {
         rb.drag = Grounded() ? rbGroundDrag : rbAirDrag;
-        //rb.useGravity = !OnSlope();
     }
-
-    private void HandleJump()
-    {
-        if (jumpInput && Grounded())
-        {
-            rb.AddForce(transform.up * jumpForce, ForceMode.Impulse);
-            jumpInput = false;
-        }
-    }
-
-    private void LateUpdate()
-    {
-        HandleCharacterStance();
-    }
-
-    private void HandleCharacterStance()
-    {
-        switch (stance)
-        {
-            case CharacterStance.Standing:
-                if (crouchInput) { RequestCharacterStanceChange(CharacterStance.Crouching); }
-                else if (proneInput) { RequestCharacterStanceChange(CharacterStance.Proning); }
-                break;
-            case CharacterStance.Crouching:
-                if (crouchInput) { RequestCharacterStanceChange(CharacterStance.Standing); }
-                else if (proneInput) { RequestCharacterStanceChange(CharacterStance.Proning); }
-                break;
-            case CharacterStance.Proning:
-                if (crouchInput) { RequestCharacterStanceChange(CharacterStance.Crouching); }
-                else if (proneInput) { RequestCharacterStanceChange(CharacterStance.Standing); }
-                break;
-        }
-    }
-
-    public bool RequestCharacterStanceChange(CharacterStance newStance)
-    {
-        if (stance == newStance)
-            return true;
-
-        switch (stance)
-        {
-            case CharacterStance.Standing:
-                if(newStance == CharacterStance.Crouching)
-                {
-                    if (!CharacterOverlap(crouchingCollider))
-                    {
-                        walkSpeed = crouchSpeed.x;
-                        runSpeed = crouchSpeed.y;
-                        stance = newStance;
-                        SetColliderDimensions(crouchingCollider);
-                        return true;
-                    }
-                }
-                else if (newStance == CharacterStance.Proning)
-                {
-                    if (!CharacterOverlap(proningCollider))
-                    {
-                        walkSpeed = proningSpeed.x;
-                        runSpeed = proningSpeed.y;
-                        stance = newStance;
-                        SetColliderDimensions(proningCollider);
-                        return true;
-                    }
-                }
-                break;
-            case CharacterStance.Crouching:
-                if (newStance == CharacterStance.Standing)
-                {
-                    if (!CharacterOverlap(standingCollider))
-                    {
-                        walkSpeed = standingSpeed.x;
-                        runSpeed = standingSpeed.y;
-                        stance = newStance;
-                        SetColliderDimensions(standingCollider);
-                        return true;
-                    }
-                }
-                else if (newStance == CharacterStance.Proning)
-                {
-                    if (!CharacterOverlap(proningCollider))
-                    {
-                        walkSpeed = proningSpeed.x;
-                        runSpeed = proningSpeed.y;
-                        stance = newStance;
-                        SetColliderDimensions(proningCollider);
-                        return true;
-                    }
-                }
-                break;
-            case CharacterStance.Proning:
-                if (newStance == CharacterStance.Standing)
-                {
-                    if (!CharacterOverlap(standingCollider))
-                    {
-                        walkSpeed = standingSpeed.x;
-                        runSpeed = standingSpeed.y;
-                        stance = newStance;
-                        SetColliderDimensions(standingCollider);
-                        return true;
-                    }
-                }
-                else if (newStance == CharacterStance.Crouching)
-                {
-                    if (!CharacterOverlap(crouchingCollider))
-                    {
-                        walkSpeed = crouchSpeed.x;
-                        runSpeed = crouchSpeed.y;
-                        stance = newStance;
-                        SetColliderDimensions(crouchingCollider);
-                        return true;
-                    }
-                }
-                break;
-        }
-
-        return false;
-    }
-
+    
     private bool CharacterOverlap(Vector3 collider)
     {
-        float radius = collider.x - colliderThreshold;
-        float height = collider.y;
-        Vector3 center = new Vector3(capsuleCollider.center.x, collider.z, capsuleCollider.center.z);
-
-        Vector3 point0;
-        Vector3 point1;
-        if(height < radius * 2)
+        if(debug)
         {
-            point0 = transform.position + center;
-            point1 = transform.position + center;
-        }
-        else
-        {
-            point0 = transform.position + center + (transform.up * (height * 0.5f - radius));
-            point1 = transform.position + center - (transform.up * (height * 0.5f - radius));
+            Debug.DrawLine(transform.position, transform.position + (Vector3.up * collider.y), Color.white, 5f);
         }
 
-        Debug.Log(point0 + ", " + point1 + ", " + radius);
-        int numOverlaps = Physics.OverlapCapsuleNonAlloc(point0, point1, radius, obstructions, layerMask);
-
-        for (int i = 0; i < numOverlaps; i++){
-            Debug.Log(obstructions[i].name);
-            if (obstructions[i] == capsuleCollider)
-                numOverlaps--;
-        }
-
-        return numOverlaps > 0;
+        return Physics.Raycast(transform.position, transform.up, collider.y + 0.01f, obstructionMask);
     }
 
     private void SetColliderDimensions(Vector3 collider)

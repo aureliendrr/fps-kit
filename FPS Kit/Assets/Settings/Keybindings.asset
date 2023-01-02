@@ -13,27 +13,39 @@ MonoBehaviour:
   m_Name: Keybindings
   m_EditorClassIdentifier: 
   keybindingChecks:
-  - action: 0
-    type: 0
-    code: 122
   - action: 1
     type: 0
-    code: 115
+    code: 122
   - action: 2
     type: 0
-    code: 100
+    code: 115
   - action: 3
     type: 0
-    code: 113
+    code: 100
   - action: 4
     type: 0
-    code: 304
+    code: 113
   - action: 5
-    type: 1
-    code: 99
+    type: 0
+    code: 304
   - action: 6
     type: 1
-    code: 120
+    code: 99
   - action: 7
     type: 1
+    code: 119
+  - action: 8
+    type: 1
     code: 32
+  - action: 9
+    type: 1
+    code: 101
+  - action: 11
+    type: 0
+    code: 324
+  - action: 12
+    type: 1
+    code: 323
+  - action: 0
+    type: 1
+    code: 283
