@@ -10,8 +10,9 @@ public class PlayerWeapon : MonoBehaviour
     public Weapon currentWeapon;
     private WeaponSettings currentWeaponSettings;
 
-    [Header("Animation")]
-    [SerializeField] private WeaponAnimation currentAnimation;
+    [Header("Inverse Kinematic")]
+    [SerializeField] private InverseKinematic leftIk;
+    [SerializeField] private InverseKinematic rightIk;
 
     [Header("Aiming")]
     [SerializeField] private bool debugAim;
@@ -66,6 +67,7 @@ public class PlayerWeapon : MonoBehaviour
         }
 
         SetDefaultValues();
+        UpdateIKTargets();
     }
 
     private void SetDefaultValues()
@@ -82,6 +84,12 @@ public class PlayerWeapon : MonoBehaviour
     {
         currentWeapon = newWeapon;
         currentWeaponSettings = currentWeapon.settings;
+    }
+
+    private void UpdateIKTargets()
+    {
+        leftIk.UpdateTarget(currentWeapon.leftHandIKTarget);
+        rightIk.UpdateTarget(currentWeapon.rightHandIKTarget);
     }
  
     private void Update()

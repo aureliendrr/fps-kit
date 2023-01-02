@@ -7,8 +7,8 @@ public class Weapon : MonoBehaviour
     public WeaponSettings settings;
 
     [Header("References")]
-    [SerializeField] private Transform leftHandIKTarget;
-    [SerializeField] private Transform rightHandIKTarget;
+    public Transform leftHandIKTarget;
+    public Transform rightHandIKTarget;
     [SerializeField] private Transform muzzlePoint;
     [SerializeField] private Transform ejectionPoint;
 

@@ -91,6 +91,11 @@ public class InverseKinematic : MonoBehaviour
         }
     }
 
+    public void UpdateTarget(Transform newTarget)
+    {
+        _target = newTarget;
+    }
+
     private void LateUpdate()
     {
         ResolveIK();
